@@ -3,7 +3,6 @@ import time
 from pprint import pprint
 import requests
 
-
 class VK:
     url_ = 'https://api.vk.com/method/'
     photo_names = []
@@ -15,10 +14,10 @@ class VK:
         self.params = {'access_token': self.vk_token,
                        'v': ver_}
 
-    def get_photo_user(self, count_, rev_=0):
+    def get_photo_user(self, count_, album_, rev_=0):
         url_get_photo_user = self.url_ + 'photos.get'
         params_get_photo_user = {'owner_id': self.user_id,
-                                 'album_id': 'profile',
+                                 'album_id': album_,
                                  'rev': rev_,
                                  'extended': '1',
                                  'photo_sizes': 1,
@@ -30,8 +29,11 @@ class VK:
         resp.raise_for_status()
 
         if 'error' in resp.json():
-            if 100 == resp.json()['error']['error_code']:
-                print('ERROR - Такого User ID не существует')
+            if 100 == resp.json()['error']['error_code'] and 'owner_id not integer' in resp.json()["""error"""]["""error_msg"""]:
+                print(f'ERROR {resp.json()["error"]["error_code"]} - Такого User ID не существует')
+                exit()
+            elif (200 == resp.json()['error']['error_code']) or (100 == resp.json()['error']['error_code'] and 'album_id is invalid' in resp.json()["""error"""]["""error_msg"""]):
+                print(f'ERROR {resp.json()["error"]["error_code"]} - Неправильно введен альбом')
                 exit()
             else:
                 print(f'ERROR - "{resp.json()["""error"""]["""error_code"""]}": "{resp.json()["""error"""]["""error_msg"""]}"')
@@ -41,10 +43,10 @@ class VK:
             exit()
         else:
             pprint(f'*** [RESPONSE] <{resp.status_code}> - путь к файлу получен успешно')
-            return resp.json()
+        return resp.json()
 
-    def get_photo_name(self):
-        self.link_ = self.get_photo_user(count_)['response']['items'][0]
+    def get_photo_name(self, album_):
+        self.link_ = self.get_photo_user(count_, album_)['response']['items'][0]
         self.likes_ = self.link_['likes']['count']
         self.date_ = time.strftime("%d_%b_%Y_%H_%M_%S", time.localtime(self.link_['date']))
         self.href_ = self.link_['sizes'][-1]['url']
@@ -96,6 +98,7 @@ if __name__ == '__main__':
         vk_ = VK(int(input('Введите ID пользователя: ')))
         ya_ = YaDisk()
         photos = input('Введите количество фото для выгрузки с ВК на Яндекс.Диск: ')
+        album = (input('Введите альбом wall/profile/saved: '))
         if photos:
             photos = int(photos)
             if photos <= 0:
@@ -104,7 +107,7 @@ if __name__ == '__main__':
             photos = 5
         for i in range(photos):
             time.sleep(0.35)
-            vk_.get_photo_name()
+            vk_.get_photo_name(album)
             ya_.upload_photo_from_internet(vk_.href_, vk_.file_name_)
             vk_.create_json()  # Подготовка JSON результирующего файла
             count_ += 1
